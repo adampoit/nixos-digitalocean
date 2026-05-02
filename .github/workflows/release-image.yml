@@ -1,0 +1,35 @@
+name: Release Image
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install Nix
+        uses: DeterminateSystems/nix-installer-action@main
+
+      - name: Build image
+        run: nix build .#packages.x86_64-linux.digitalocean-image
+
+      - name: Prepare artifacts
+        run: |
+          mkdir -p artifacts
+          cp result/*.qcow2.gz artifacts/nixos-digitalocean-base-${GITHUB_REF_NAME}.qcow2.gz
+          cd artifacts
+          sha256sum nixos-digitalocean-base-${GITHUB_REF_NAME}.qcow2.gz > nixos-digitalocean-base-${GITHUB_REF_NAME}.sha256
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: artifacts/*
+          generate_release_notes: true
