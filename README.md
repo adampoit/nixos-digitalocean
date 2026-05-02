@@ -49,19 +49,19 @@ The resulting image will be symlinked at `./result/`.
 ```bash
 doctl compute image create "nixos-do-base-YYYYMMDD" \
   --region sfo3 \
-  --distribution Unknown \
+  --image-distribution Unknown \
   --image-url "https://example.com/nixos-do-base-YYYYMMDD.qcow2.gz" \
-  --tag-name nixos \
-  --tag-name digitalocean-base
+  --tag-names nixos,digitalocean-base
 ```
 
-4. Wait until the image status is `available`:
+4. Wait until the image status is `available`. Image imports can take 10+ minutes:
 
 ```bash
-doctl compute image list-user --format ID,Name,Status,Regions
+doctl compute image list-user --output json | \
+  jq '.[] | select(.name == "nixos-do-base-YYYYMMDD") | {id, name, status, regions}'
 ```
 
-5. Create a droplet from the custom image:
+5. Create a droplet from the custom image. You **must** use an SSH key — custom images do not support password reset via the control panel:
 
 ```bash
 doctl compute droplet create my-nixos-droplet \
@@ -69,16 +69,17 @@ doctl compute droplet create my-nixos-droplet \
   --size s-1vcpu-1gb \
   --image "$IMAGE_ID" \
   --ssh-keys "$SSH_KEY_ID" \
-  --enable-monitoring \
   --wait
 ```
+
+> **Note:** `--enable-monitoring` is not supported for custom images.
 
 ## What's in the base module
 
 - Imports Nixpkgs' official `digital-ocean-config.nix`
 - Enables `nix-command` and `flakes` experimental features
 - Sets a 10-second GRUB timeout
-- Pins kernel to `linuxPackages_6_12` (overridable with `lib.mkDefault`)
+- Uses the default NixOS kernel (can be overridden in downstream configs)
 - Enables OpenSSH with password and keyboard-interactive auth disabled
 - Enables DigitalOcean SSH key and entropy seeding
 - Enables the DigitalOcean monitoring agent (`do-agent`)
