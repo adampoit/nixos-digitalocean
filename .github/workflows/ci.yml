@@ -64,8 +64,12 @@ jobs:
           aws s3 cp "nixos-digitalocean-base-${GITHUB_REF_NAME}.qcow2.gz" \
             "s3://nixos-image-staging/tmp/${GITHUB_REF_NAME}.qcow2.gz" \
             --endpoint-url https://sfo3.digitaloceanspaces.com
+          PRESIGNED_URL=$(aws s3 presign \
+            "s3://nixos-image-staging/tmp/${GITHUB_REF_NAME}.qcow2.gz" \
+            --endpoint-url https://sfo3.digitaloceanspaces.com \
+            --expires-in 3600)
           echo "ARTIFACT_NAME=nixos-digitalocean-base-${GITHUB_REF_NAME}.qcow2.gz" >> "$GITHUB_ENV"
-          echo "SPACES_URL=https://nixos-image-staging.sfo3.digitaloceanspaces.com/tmp/${GITHUB_REF_NAME}.qcow2.gz" >> "$GITHUB_ENV"
+          echo "SPACES_URL=$PRESIGNED_URL" >> "$GITHUB_ENV"
 
       - name: Install doctl
         uses: digitalocean/action-doctl@v2
