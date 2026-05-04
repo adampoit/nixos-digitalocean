@@ -353,7 +353,7 @@ jobs:
         if: steps.prev_tag.outputs.skip == 'false'
         run: |
           echo "Deploying current flake to test droplet..."
-          nix run .#deploy-rs -- .#test-droplet
+          nix run github:serokell/deploy-rs -- .#test-droplet
 
       - name: Verify system health after deploy
         if: steps.prev_tag.outputs.skip == 'false'
