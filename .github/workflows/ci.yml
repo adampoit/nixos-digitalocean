@@ -1,4 +1,4 @@
-name: Build, Test on DO, and Release
+name: CI
 
 on:
   push:
@@ -218,8 +218,10 @@ jobs:
       - name: Find previous tag
         id: prev_tag
         run: |
-          PREV_TAG=$(git describe --tags --abbrev=0 HEAD~1 2>/dev/null || echo "")
-          if [ -z "$PREV_TAG" ]; then
+          # Find the tag with the immediately preceding date in its name,
+          # regardless of which branch it was created on.
+          PREV_TAG=$(git tag --list 'v*' --sort=v:refname | grep -B 1 "^${GITHUB_REF_NAME}$" | head -1)
+          if [ -z "$PREV_TAG" ] || [ "$PREV_TAG" = "${GITHUB_REF_NAME}" ]; then
             echo "No previous tag found. Skipping upgrade test."
             echo "skip=true" >> "$GITHUB_OUTPUT"
           else
