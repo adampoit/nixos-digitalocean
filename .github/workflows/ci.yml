@@ -335,6 +335,28 @@ jobs:
           echo "Error: SSH did not become available within 5 minutes"
           exit 1
 
+      - name: Verify system health before upgrade
+        if: steps.prev_tag.outputs.skip == 'false'
+        run: |
+          ssh -o StrictHostKeyChecking=no \
+              -o UserKnownHostsFile=/dev/null \
+              -o BatchMode=yes \
+              -i /tmp/do_test_key \
+              root@"$DROPLET_IP" '
+                set -e
+                echo "=== Kernel (before upgrade) ==="
+                uname -a
+                echo "=== NixOS Version (before upgrade) ==="
+                nixos-version
+                echo "=== SSH Status ==="
+                systemctl is-active sshd.service
+                echo "=== DO Agent Status ==="
+                systemctl is-active do-agent.service || true
+                echo "=== Disk Usage ==="
+                df -h /
+                echo "=== All pre-upgrade checks passed ==="
+              '
+
       - name: Set up SSH config for deploy-rs
         if: steps.prev_tag.outputs.skip == 'false'
         run: |
@@ -386,7 +408,7 @@ jobs:
           echo "Error: System did not come back after reboot"
           exit 1
 
-      - name: Verify system health after deploy
+      - name: Verify system health after reboot
         if: steps.prev_tag.outputs.skip == 'false'
         run: |
           ssh -o StrictHostKeyChecking=no \
@@ -395,9 +417,9 @@ jobs:
               -i /tmp/do_test_key \
               root@"$DROPLET_IP" '
                 set -e
-                echo "=== Kernel ==="
+                echo "=== Kernel (after upgrade + reboot) ==="
                 uname -a
-                echo "=== NixOS Version ==="
+                echo "=== NixOS Version (after upgrade + reboot) ==="
                 nixos-version
                 echo "=== SSH Status ==="
                 systemctl is-active sshd.service
@@ -407,7 +429,7 @@ jobs:
                 df -h /
                 echo "=== Nix Store ==="
                 nix --version
-                echo "=== All checks passed ==="
+                echo "=== All post-upgrade checks passed ==="
               '
 
       - name: Cleanup droplet
