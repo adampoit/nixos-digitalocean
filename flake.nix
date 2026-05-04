@@ -2,7 +2,7 @@
   description = "Generic NixOS base image for DigitalOcean";
 
   inputs = {
-    nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
+    nixpkgs.url = "github:NixOS/nixpkgs/13868c071cc73a5e9f610c47d7bb08e5da64fdd5";
     flake-utils.url = "github:numtide/flake-utils";
     deploy-rs.url = "github:serokell/deploy-rs";
   };
