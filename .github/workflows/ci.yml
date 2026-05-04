@@ -61,15 +61,19 @@ jobs:
           cd artifacts
           ARTIFACT=$(ls *.qcow2.gz | head -1)
           mv "$ARTIFACT" "nixos-digitalocean-base-${GITHUB_REF_NAME}.qcow2.gz"
+          # Use run ID for unique filename to avoid race conditions
+          UNIQUE_NAME="tmp/${GITHUB_REF_NAME}-${GITHUB_RUN_ID}.qcow2.gz"
           aws s3 cp "nixos-digitalocean-base-${GITHUB_REF_NAME}.qcow2.gz" \
-            "s3://nixos-image-staging/tmp/${GITHUB_REF_NAME}.qcow2.gz" \
+            "s3://nixos-image-staging/$UNIQUE_NAME" \
             --endpoint-url https://sfo3.digitaloceanspaces.com
-          PRESIGNED_URL=$(aws s3 presign \
-            "s3://nixos-image-staging/tmp/${GITHUB_REF_NAME}.qcow2.gz" \
-            --endpoint-url https://sfo3.digitaloceanspaces.com \
-            --expires-in 3600)
+          aws s3api put-object-acl \
+            --bucket nixos-image-staging \
+            --key "$UNIQUE_NAME" \
+            --acl public-read \
+            --endpoint-url https://sfo3.digitaloceanspaces.com
           echo "ARTIFACT_NAME=nixos-digitalocean-base-${GITHUB_REF_NAME}.qcow2.gz" >> "$GITHUB_ENV"
-          echo "SPACES_URL=$PRESIGNED_URL" >> "$GITHUB_ENV"
+          echo "SPACES_URL=https://nixos-image-staging.sfo3.digitaloceanspaces.com/$UNIQUE_NAME" >> "$GITHUB_ENV"
+          echo "SPACES_KEY=$UNIQUE_NAME" >> "$GITHUB_ENV"
 
       - name: Install doctl
         uses: digitalocean/action-doctl@v2
@@ -92,16 +96,22 @@ jobs:
 
       - name: Import image to DigitalOcean
         run: |
-          IMAGE_NAME="nixos-do-base-${GITHUB_REF_NAME}"
+          # Use unique name per run to avoid DO's post-deletion cooldown
+          IMAGE_NAME="nixos-do-base-${GITHUB_REF_NAME}-${GITHUB_RUN_ID}"
+          echo "Importing from URL: $SPACES_URL"
+          echo "Image name: $IMAGE_NAME"
           doctl compute image create "$IMAGE_NAME" \
             --region sfo3 \
             --image-distribution Unknown \
-            --image-url "$SPACES_URL" \
-            --tag-names nixos-test,github-actions
+            --image-url "$SPACES_URL"
+          IMAGE_ID=$(doctl compute image list-user --output json | \
+            jq -r ".[] | select(.name == \"$IMAGE_NAME\") | .id")
+          echo "Created image ID: $IMAGE_ID"
+          echo "IMAGE_ID=$IMAGE_ID" >> "$GITHUB_ENV"
 
       - name: Wait for image to become available
         run: |
-          IMAGE_NAME="nixos-do-base-${GITHUB_REF_NAME}"
+          IMAGE_NAME="nixos-do-base-${GITHUB_REF_NAME}-${GITHUB_RUN_ID}"
           for i in $(seq 1 60); do
             STATUS=$(doctl compute image list-user --output json | \
               jq -r ".[] | select(.name == \"$IMAGE_NAME\") | .status")
@@ -126,7 +136,6 @@ jobs:
             --size s-1vcpu-1gb \
             --image "$IMAGE_ID" \
             --ssh-keys "$SSH_KEY_ID" \
-            --tag-names nixos-test,github-actions \
             --wait \
             --format ID,PublicIPv4 \
             --no-header > /tmp/droplet_info
@@ -206,7 +215,7 @@ jobs:
           echo "Deleting temporary Spaces object..."
           aws configure set aws_access_key_id "${{ secrets.SPACES_ACCESS_KEY_ID }}"
           aws configure set aws_secret_access_key "${{ secrets.SPACES_SECRET_ACCESS_KEY }}"
-          aws s3 rm "s3://nixos-image-staging/tmp/${GITHUB_REF_NAME}.qcow2.gz" \
+          aws s3 rm "s3://nixos-image-staging/$SPACES_KEY" \
             --endpoint-url https://sfo3.digitaloceanspaces.com || true
 
   test-upgrade:
@@ -263,18 +272,17 @@ jobs:
       - name: Import previous release image to DigitalOcean
         if: steps.prev_tag.outputs.skip == 'false'
         run: |
-          IMAGE_NAME="nixos-do-base-upgrade-${GITHUB_REF_NAME}"
+          IMAGE_NAME="nixos-do-base-upgrade-${GITHUB_REF_NAME}-${GITHUB_RUN_ID}"
           IMAGE_URL="https://github.com/${{ github.repository }}/releases/download/${PREV_TAG}/nixos-digitalocean-base-${PREV_TAG}.qcow2.gz"
           doctl compute image create "$IMAGE_NAME" \
             --region sfo3 \
             --image-distribution Unknown \
-            --image-url "$IMAGE_URL" \
-            --tag-names nixos-test,github-actions,upgrade-test
+            --image-url "$IMAGE_URL"
 
       - name: Wait for image to become available
         if: steps.prev_tag.outputs.skip == 'false'
         run: |
-          IMAGE_NAME="nixos-do-base-upgrade-${GITHUB_REF_NAME}"
+          IMAGE_NAME="nixos-do-base-upgrade-${GITHUB_REF_NAME}-${GITHUB_RUN_ID}"
           for i in $(seq 1 60); do
             STATUS=$(doctl compute image list-user --output json | \
               jq -r ".[] | select(.name == \"$IMAGE_NAME\") | .status")
@@ -300,7 +308,6 @@ jobs:
             --size s-1vcpu-1gb \
             --image "$IMAGE_ID" \
             --ssh-keys "$SSH_KEY_ID" \
-            --tag-names nixos-test,github-actions,upgrade-test \
             --wait \
             --format ID,PublicIPv4 \
             --no-header > /tmp/droplet_info
@@ -403,6 +410,9 @@ jobs:
     env:
       GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
     steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
       - name: Download image artifact
         uses: actions/download-artifact@v4
         with:
