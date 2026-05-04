@@ -53,17 +53,19 @@ jobs:
           name: digitalocean-image
           path: ./artifacts
 
-      - name: Create draft release with artifact
+      - name: Upload image to DO Spaces for testing
         run: |
+          pip install awscli
+          aws configure set aws_access_key_id "${{ secrets.SPACES_ACCESS_KEY_ID }}"
+          aws configure set aws_secret_access_key "${{ secrets.SPACES_SECRET_ACCESS_KEY }}"
           cd artifacts
           ARTIFACT=$(ls *.qcow2.gz | head -1)
           mv "$ARTIFACT" "nixos-digitalocean-base-${GITHUB_REF_NAME}.qcow2.gz"
-          gh release create "${GITHUB_REF_NAME}" \
-            --draft \
-            --title "${GITHUB_REF_NAME}" \
-            --notes "Automated release — validating on DigitalOcean" \
-            "nixos-digitalocean-base-${GITHUB_REF_NAME}.qcow2.gz"
+          aws s3 cp "nixos-digitalocean-base-${GITHUB_REF_NAME}.qcow2.gz" \
+            "s3://nixos-image-staging/tmp/${GITHUB_REF_NAME}.qcow2.gz" \
+            --endpoint-url https://sfo3.digitaloceanspaces.com
           echo "ARTIFACT_NAME=nixos-digitalocean-base-${GITHUB_REF_NAME}.qcow2.gz" >> "$GITHUB_ENV"
+          echo "SPACES_URL=https://nixos-image-staging.sfo3.digitaloceanspaces.com/tmp/${GITHUB_REF_NAME}.qcow2.gz" >> "$GITHUB_ENV"
 
       - name: Install doctl
         uses: digitalocean/action-doctl@v2
@@ -87,11 +89,10 @@ jobs:
       - name: Import image to DigitalOcean
         run: |
           IMAGE_NAME="nixos-do-base-${GITHUB_REF_NAME}"
-          IMAGE_URL="https://github.com/${{ github.repository }}/releases/download/${GITHUB_REF_NAME}/${ARTIFACT_NAME}"
           doctl compute image create "$IMAGE_NAME" \
             --region sfo3 \
             --image-distribution Unknown \
-            --image-url "$IMAGE_URL" \
+            --image-url "$SPACES_URL" \
             --tag-names nixos-test,github-actions
 
       - name: Wait for image to become available
@@ -195,11 +196,14 @@ jobs:
             doctl compute image delete "$IMAGE_ID" --force || true
           fi
 
-      - name: Delete draft release on failure
-        if: failure()
+      - name: Cleanup Spaces object
+        if: always()
         run: |
-          echo "Tests failed. Deleting draft release ${GITHUB_REF_NAME}..."
-          gh release delete "${GITHUB_REF_NAME}" --yes || true
+          echo "Deleting temporary Spaces object..."
+          aws configure set aws_access_key_id "${{ secrets.SPACES_ACCESS_KEY_ID }}"
+          aws configure set aws_secret_access_key "${{ secrets.SPACES_SECRET_ACCESS_KEY }}"
+          aws s3 rm "s3://nixos-image-staging/tmp/${GITHUB_REF_NAME}.qcow2.gz" \
+            --endpoint-url https://sfo3.digitaloceanspaces.com || true
 
   test-upgrade:
     needs: build
@@ -399,15 +403,18 @@ jobs:
           name: digitalocean-image
           path: ./artifacts
 
-      - name: Publish release
-        run: |
-          echo "Publishing release ${GITHUB_REF_NAME}..."
-          gh release edit "${GITHUB_REF_NAME}" --draft=false
-
-      - name: Compute checksum and upload to release
+      - name: Create GitHub release
         run: |
           cd artifacts
           ARTIFACT=$(ls *.qcow2.gz | head -1)
           mv "$ARTIFACT" "nixos-digitalocean-base-${GITHUB_REF_NAME}.qcow2.gz"
+          gh release create "${GITHUB_REF_NAME}" \
+            --title "${GITHUB_REF_NAME}" \
+            --notes "Automated release — validated on DigitalOcean" \
+            "nixos-digitalocean-base-${GITHUB_REF_NAME}.qcow2.gz"
+
+      - name: Compute checksum and upload to release
+        run: |
+          cd artifacts
           sha256sum "nixos-digitalocean-base-${GITHUB_REF_NAME}.qcow2.gz" > "nixos-digitalocean-base-${GITHUB_REF_NAME}.sha256"
           gh release upload "${GITHUB_REF_NAME}" "nixos-digitalocean-base-${GITHUB_REF_NAME}.sha256"
