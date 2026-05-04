@@ -352,8 +352,39 @@ jobs:
       - name: Deploy current flake via deploy-rs
         if: steps.prev_tag.outputs.skip == 'false'
         run: |
-          echo "Deploying current flake to test droplet..."
-          nix run github:serokell/deploy-rs -- .#test-droplet
+          echo "Installing new generation to bootloader..."
+          # Use --boot to install without activating, avoiding service reload issues
+          nix run github:serokell/deploy-rs -- \
+            --magic-rollback false \
+            --boot \
+            .#test-droplet
+
+      - name: Reboot into new generation
+        if: steps.prev_tag.outputs.skip == 'false'
+        run: |
+          echo "Rebooting into upgraded system..."
+          ssh -o StrictHostKeyChecking=no \
+              -o UserKnownHostsFile=/dev/null \
+              -o ConnectTimeout=5 \
+              -o BatchMode=yes \
+              -i /tmp/do_test_key \
+              root@"$DROPLET_IP" 'reboot' || true
+          # Wait for reboot
+          for i in $(seq 1 60); do
+            if ssh -o StrictHostKeyChecking=no \
+                   -o UserKnownHostsFile=/dev/null \
+                   -o ConnectTimeout=5 \
+                   -o BatchMode=yes \
+                   -i /tmp/do_test_key \
+                   root@"$DROPLET_IP" 'echo reboot-ready' 2>/dev/null; then
+              echo "System back after reboot"
+              exit 0
+            fi
+            echo "Waiting for reboot... (attempt $i/60)"
+            sleep 5
+          done
+          echo "Error: System did not come back after reboot"
+          exit 1
 
       - name: Verify system health after deploy
         if: steps.prev_tag.outputs.skip == 'false'
