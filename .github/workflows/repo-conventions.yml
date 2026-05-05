@@ -1,0 +1,23 @@
+name: Apply Repository Conventions
+
+on:
+  schedule:
+    - cron: "42 9 * * 1-5"
+  workflow_dispatch:
+    inputs:
+      conventions:
+        type: string
+        description: Optional convention names to add (space-separated)
+        required: false
+        default: ""
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  apply:
+    uses: Faithlife/CodingGuidelines/.github/workflows/repo-conventions-call.yml@master
+    with:
+      conventions: ${{ github.event.inputs.conventions || '' }}
+    secrets: inherit
