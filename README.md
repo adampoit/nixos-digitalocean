@@ -61,11 +61,10 @@ Add this repo as a flake input and deploy changes directly:
 {
   inputs.nixos-digitalocean.url = "github:adampoit/nixos-digitalocean";
 
-  outputs = { self, nixpkgs, nixos-digitalocean, ... }: {
-    nixosConfigurations.my-droplet = nixpkgs.lib.nixosSystem {
+  outputs = { self, nixos-digitalocean, deploy-rs, ... }: {
+    nixosConfigurations.my-droplet = nixos-digitalocean.lib.mkDigitalOceanSystem {
       system = "x86_64-linux";
       modules = [
-        nixos-digitalocean.nixosModules.digitalocean-base
         ./my-host-configuration.nix
       ];
     };

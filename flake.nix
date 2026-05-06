@@ -15,6 +15,19 @@
     ...
   }: let
     lib = nixpkgs.lib;
+    mkDigitalOceanSystem = {
+      system ? "x86_64-linux",
+      modules ? [],
+      specialArgs ? {},
+    }:
+      lib.nixosSystem {
+        inherit system specialArgs;
+        modules =
+          [
+            self.nixosModules.digitalocean-base
+          ]
+          ++ modules;
+      };
   in
     flake-utils.lib.eachDefaultSystem (
       system: let
@@ -31,13 +44,12 @@
       }
     )
     // {
+      lib.mkDigitalOceanSystem = mkDigitalOceanSystem;
+
       nixosModules.digitalocean-base = import ./modules/digitalocean-base.nix;
 
-      nixosConfigurations.digitalocean-base = lib.nixosSystem {
+      nixosConfigurations.digitalocean-base = mkDigitalOceanSystem {
         system = "x86_64-linux";
-        modules = [
-          self.nixosModules.digitalocean-base
-        ];
       };
 
       packages.x86_64-linux.digitalocean-image =
