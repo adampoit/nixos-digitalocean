@@ -1,0 +1,11 @@
+{
+  "name": "nixos-digitalocean",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "changelog": "node --experimental-strip-types ./scripts/changelog.ts --print",
+    "changelog:raw": "node --experimental-strip-types ./scripts/raw-changelog.ts",
+    "release": "gh workflow run draft-release.yml"
+  }
+}
