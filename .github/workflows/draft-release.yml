@@ -4,11 +4,11 @@ on:
   workflow_dispatch:
     inputs:
       tag:
-        description: 'Release tag (e.g. v20260511). Defaults to today.'
+        description: "Release tag (e.g. v20260511). Defaults to today."
         type: string
         required: false
       to:
-        description: 'Target ref (default: HEAD)'
+        description: "Target ref (default: HEAD)"
         type: string
         required: false
         default: HEAD
@@ -265,10 +265,10 @@ jobs:
       - name: Find previous tag
         id: prev_tag
         run: |
-          # Find the tag with the immediately preceding date in its name,
-          # regardless of which branch it was created on.
-          PREV_TAG=$(git tag --list 'v*' --sort=v:refname | grep -B 1 "^${RELEASE_TAG}$" | head -1)
-          if [ -z "$PREV_TAG" ] || [ "$PREV_TAG" = "${RELEASE_TAG}" ]; then
+          # Find the newest existing release tag older than the tag being drafted.
+          # The draft tag does not exist yet, so do not search relative to it in `git tag` output.
+          PREV_TAG=$(git tag --list 'v*' --sort=-v:refname | awk -v current="${RELEASE_TAG}" '$0 < current { print; exit }')
+          if [ -z "$PREV_TAG" ]; then
             echo "No previous tag found. Skipping upgrade test."
             echo "skip=true" >> "$GITHUB_OUTPUT"
           else
@@ -506,7 +506,7 @@ jobs:
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
-          node-version: '24'
+          node-version: "24"
 
       - name: Install OpenCode
         run: npm install -g opencode-ai

@@ -9,17 +9,18 @@ Before keeping an entry, inspect the real diff with `git show --stat --format=''
 
 Rules:
 
--   Write release notes for users of the `nixos-digitalocean` base image.
--   Keep sections in this order: `## Features`, `## Improvements`, `## Bugfixes`.
--   Only include sections that have at least one notable entry.
--   Keep one bullet per commit you keep.
--   Skip changes that are entirely internal, CI-only, tests-only, formatting-only, or release mechanics.
--   Start each bullet with a capital letter.
--   Prefer user-facing outcomes over implementation details.
--   Do not copy raw commit prefixes like `fix:` or `feat:`.
--   Do not include file lists in the final output.
--   If no notable entries remain, write exactly `No notable changes.`
--   Be concise; release notes should be easy to skim.
+- Write release notes for users of the `nixos-digitalocean` base image.
+- Keep sections in this order: `## Features`, `## Improvements`, `## Bugfixes`.
+- Only include sections that have at least one notable entry.
+- Keep one bullet per commit you keep.
+- Skip changes that are entirely internal, CI-only, tests-only, formatting-only, or release mechanics.
+- If the input includes a `nixpkgs version:` line, always include it as a user-facing improvement, even when no other notable entries remain.
+- Start each bullet with a capital letter.
+- Prefer user-facing outcomes over implementation details.
+- Do not copy raw commit prefixes like `fix:` or `feat:`.
+- Do not include file lists in the final output.
+- If no notable entries remain and there is no `nixpkgs version:` line, write exactly `No notable changes.`
+- Be concise; release notes should be easy to skim.
 
 <changelog_input>
 
