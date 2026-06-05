@@ -2,7 +2,7 @@ name: Apply Repository Conventions
 
 on:
   schedule:
-    - cron: "42 9 * * 1-5"
+    - cron: "49 9 * * 1-5"
   workflow_dispatch:
     inputs:
       conventions:
@@ -17,28 +17,7 @@ permissions:
 
 jobs:
   apply:
-    runs-on: ubuntu-latest
-    env:
-      GH_TOKEN: ${{ secrets.ACTIONS_PAT }}
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-        with:
-          token: ${{ secrets.ACTIONS_PAT }}
-
-      - name: Setup .NET
-        uses: actions/setup-dotnet@v4
-        with:
-          dotnet-version: 10.0.x
-
-      - name: Configure Git identity
-        run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-
-      - name: Add requested conventions
-        if: ${{ github.event_name == 'workflow_dispatch' && inputs.conventions != '' }}
-        run: dnx repo-conventions add ${{ inputs.conventions }} --commit
-
-      - name: Apply conventions
-        run: dnx repo-conventions apply --open-pr
+    uses: Faithlife/CodingGuidelines/.github/workflows/repo-conventions-call.yml@master
+    with:
+      conventions: ${{ github.event.inputs.conventions || '' }}
+    secrets: inherit
