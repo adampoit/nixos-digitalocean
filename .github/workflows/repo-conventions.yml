@@ -22,7 +22,6 @@ jobs:
       - id: not-adam
         uses: adampoit/not-adam@v1
         with:
-          app-id: ${{ vars.NOT_ADAM_APP_ID }}
           private-key: ${{ secrets.NOT_ADAM_APP_PRIVATE_KEY }}
 
       - name: Checkout
