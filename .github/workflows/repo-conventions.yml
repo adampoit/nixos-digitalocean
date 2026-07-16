@@ -2,14 +2,14 @@ name: Apply Repository Conventions
 
 on:
   schedule:
-    - cron: "49 9 * * 1-5"
+    - cron: '49 9 * * 1-5'
   workflow_dispatch:
     inputs:
       conventions:
         type: string
         description: Optional convention names to add (space-separated)
         required: false
-        default: ""
+        default: ''
 
 permissions:
   contents: write
